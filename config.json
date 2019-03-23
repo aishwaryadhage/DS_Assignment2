@@ -1,0 +1,10 @@
+{
+  "data": "a",
+  "conn_type": "tom",
+  "type": "app",
+  "timestamp": 0,
+  "ack_flag": 0,
+  "msg_id": 0,
+  "ports": [4212, 4213],
+  "p2p_destination": 4212
+}
