@@ -41,11 +41,11 @@ def sendmsg(port):
 
 lis = []
 count = 0
-for pid in range(2):
+for pid in range(len(ports)):
     lis.append(threading.Thread(
         target=sendmsg, args=(ports[pid],)))
 
-for i in range(2):
+for i in range(len(ports)):
     lis[i].start()
-for i in range(2):
+for i in range(len(ports)):
     lis[i].join()
