@@ -1,14 +1,14 @@
 # DS_Assignment2
 
-To run the protocol, run p_process_2.py 
-For testing, run sender_example.py
+To run the protocol, run "python init_cluster.py" 
+For testing, run "python sender_example.py"
 
 Detailed explanation of the protocol and design decisions are mentioned in the REPORT.
 
-Output shows a list of sequence of the messages received simultaneously by two processes.
+Some of the testcases and its screenshots are mentioned in REPORT.
 
 
 ## Testing:
-We can chose msg or msg1 in sender_example.py for testing tom or p2p.
-We can also change number of processes by changing global ports in both sender_example.py and p_process_2.py - [6001, 6002]
-
+To test with n number of processes, 
+change the config.json
+If ports changed: Add them to init_cluster() method as argument in init_cluster.py
