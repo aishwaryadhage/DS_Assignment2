@@ -1,24 +1,19 @@
-import zmq
 import threading
-import heapq
 import json
 from multiprocessing import Process
 import time
 import socket
-import Queue
 
-ports = [6001, 6002, 6003]
+ports = [6001, 6002]
 
 
 class Server():
     def __init__(self, port):
         self.port = port
-        self.test_flag = 0
         self.pid = port % 10
         self.timestamp = 0
         self.queue = []
         self.output = []
-        self.head = {}
         self.ack = {}
         self.sent_ack = {}
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -28,10 +23,12 @@ class Server():
     def start(self):
         while True:
             conn, addr = self.s.accept()
+            time.sleep(1)
             threading.Thread(target=self.on_new_msg, args=(conn, addr)).start()
 
     def on_new_msg(self, conn, addr):
         msg = conn.recv(1024)
+        # print "process with port {0} listening".format(self.port)
         msg = json.loads(msg)
         if msg["conn_type"] == "p2p":
             self.peer2peer(msg)
@@ -50,32 +47,27 @@ class Server():
             s.send(json.dumps(msg))
             # s.close()
         elif msg["type"] == "data":
-            print "msg on port: {0} received msg: {1}".format(self.port, msg)
+            print "msg on port: {0} received msg: {1}".format(
+                self.port, msg["data"])
             return
 
     def tom(self, msg):
         if msg["type"] == "app":
-            thread = threading.Thread(
-                target=self.process_app, args=(msg, ))
-            thread.start()
+            self.process_app(msg)
         elif msg["type"] == "data":
-            thread = threading.Thread(
-                target=self.process_received_data, args=(msg, ))
-            thread.start()
+            self.process_received_data(msg)
         elif msg["type"] == "ack":
-            thread = threading.Thread(
-                target=self.process_ack, args=(msg, ))
-            thread.start()
+            self.process_ack(msg)
         else:
             print "Invalid message type: ", msg["type"]
 
     def process_app(self, msg):
         self.timestamp = max(int(self.timestamp),
                              int(msg["timestamp"])) + 1
+        print "timestamp of port: {0}  is: {1} and msg: {2}".format(
+            self.port, self.timestamp, msg["data"])
         for port in ports:
-            thread = threading.Thread(
-                target=self.send_msg, args=(msg, port))
-            thread.start()
+            self.send_msg(msg, port)
 
     def send_msg(self, msg, port):
         msg["type"] = "data"
@@ -83,66 +75,73 @@ class Server():
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.connect(("127.0.0.1", (port)))
         s.send(json.dumps(msg))
-        s.close()
 
     def process_received_data(self, msg):
         self.queue.append(msg)
+        print "msg_id", self.queue[0]["msg_id"]
         self.queue = sorted(self.queue, key=lambda x: x["timestamp"])
+        time.sleep(1)
         self.timestamp = max(int(self.timestamp),
                              int(msg["timestamp"])) + 1
 
-        while len(self.queue) > 0:
-            # print "this is queue", self.queue
-            self.head = self.queue[0]
-            # time.sleep(1)
-            if self.head["msg_id"] not in self.sent_ack:
-                self.sent_ack[self.head["msg_id"]] = 1
-                self.head["ack_flag"] = 1
-                # print "at the head"
-                self.queue.pop(0)
-                for port in ports:
-                    thread = threading.Thread(
-                        target=self.send_ack, args=(self.head, port))
-                    thread.start()
-                # thread.join()
+        if self.queue[0]["msg_id"] not in self.sent_ack:
+            self.sent_ack[self.queue[0]["msg_id"]] = 1
+            for port in ports:
+                self.send_ack(self.queue[0], port)
 
     def send_ack(self, msg, port):
+        # print "send ack test msg {0} on port {1}".format(msg, self.port)
         msg["type"] = "ack"
         msg["timestamp"] = self.timestamp+0.1*self.pid
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.connect(("127.0.0.1", (port)))
-            s.send(json.dumps(msg))
-        except socket.error, exc:
-            print "Caught exception socket.error : %s" % exc
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect(("127.0.0.1", (port)))
+        s.send(json.dumps(msg))
 
     def process_ack(self, msg):
+        # print "process ack {0} on port {1}".format(msg, self.port)
         self.timestamp = max(int(self.timestamp),
                              int(msg["timestamp"])) + 1
-
         if msg["msg_id"] in self.ack:
             self.ack[msg["msg_id"]] += 1
         else:
             self.ack[msg["msg_id"]] = 1
-        if self.ack[msg["msg_id"]] == len(ports):
-            print "Consume message with data {0} on port {1} ".format(
-                msg["data"], self.port)
-            self.output.append(msg["data"])
-            # if self.queue != []:
-            #     self.queue.pop(0)
-            # self.ack.pop(msg["msg_id"], None)
-            self.head = {}
-            # self.sent_ack.pop(msg["msg_id"])
+        # print self.ack
+        # time.sleep(2)
+        # print self.ack[self.queue[0]["msg_id"]]
+        while len(self.queue) > 0:
+            time.sleep(1)
+            if len(self.queue) > 0 and self.queue[0]["msg_id"] in self.ack and self.ack[self.queue[0]["msg_id"]] == 2:
+                m1 = self.queue.pop(0)
+                # time.sleep(1)
+                self.queue = sorted(self.queue, key=lambda x: x["timestamp"])
+                time.sleep(1)
+                self.output.append(m1["data"])
+                print "Consume message with data {0} on port {1} ".format(
+                    msg["data"], self.port)
+            if len(self.queue) > 0 and self.queue[0]["msg_id"] not in self.sent_ack:
+                # print "hello"
+                self.sent_ack[self.queue[0]["msg_id"]] = 1
+                self.queue[0]["ack_flag"] = 1
+                for port in ports:
+                    time.sleep(1)
+                    if len(self.queue) > 0:
+                        self.send_ack(self.queue[0], port)
+                break
 
 
 def waitforreply(p):
+    output = []
     while True:
         if p.output:
-            print "output", p.output
+            # time.sleep(1)
+            # print "output", p.output
+            output.append(p.output)
             p.output = []
+            print output
 
 
 def application_layer(ip, pid):
+    print "started server", pid
     p = Server(ports[pid])
     threading.Thread(target=waitforreply, args=(p,)).start()
     threading.Thread(target=p.start(), args=(ip, pid)).start()
@@ -158,4 +157,4 @@ def init_cluster(n):
             print "process could not be instantiated"
 
 
-init_cluster(3)
+init_cluster(2)
