@@ -165,4 +165,4 @@ def init_cluster(n):
             print "process could not be instantiated"
 
 
-init_cluster(2)
+init_cluster(len(ports))
