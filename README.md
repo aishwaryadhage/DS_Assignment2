@@ -1,4 +1,4 @@
-# DS_Assignment2
+# DS Assignment 2
 
 To run the protocol, run "python init_cluster.py" 
 For testing, run "python sender_example.py"
