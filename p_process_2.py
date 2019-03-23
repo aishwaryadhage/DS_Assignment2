@@ -3,12 +3,14 @@ import json
 from multiprocessing import Process
 import time
 import socket
+from threading import Lock
 
 ports = [6001, 6002]
 
 
 class Server():
     def __init__(self, port):
+        self.lock = Lock()
         self.port = port
         self.pid = port % 10
         self.timestamp = 0
@@ -62,8 +64,10 @@ class Server():
             print "Invalid message type: ", msg["type"]
 
     def process_app(self, msg):
+        self.lock.acquire()
         self.timestamp = max(int(self.timestamp),
                              int(msg["timestamp"])) + 1
+        self.lock.release()
         print "timestamp of port: {0}  is: {1} and msg: {2}".format(
             self.port, self.timestamp, msg["data"])
         for port in ports:
@@ -77,10 +81,11 @@ class Server():
         s.send(json.dumps(msg))
 
     def process_received_data(self, msg):
+        self.lock.acquire()
         self.queue.append(msg)
         print "msg_id", self.queue[0]["msg_id"]
         self.queue = sorted(self.queue, key=lambda x: x["timestamp"])
-        time.sleep(1)
+        # time.sleep(1)
         self.timestamp = max(int(self.timestamp),
                              int(msg["timestamp"])) + 1
 
@@ -88,6 +93,7 @@ class Server():
             self.sent_ack[self.queue[0]["msg_id"]] = 1
             for port in ports:
                 self.send_ack(self.queue[0], port)
+        self.lock.release()
 
     def send_ack(self, msg, port):
         # print "send ack test msg {0} on port {1}".format(msg, self.port)
@@ -109,12 +115,13 @@ class Server():
         # time.sleep(2)
         # print self.ack[self.queue[0]["msg_id"]]
         while len(self.queue) > 0:
-            time.sleep(1)
+            self.lock.acquire()
+            # time.sleep(1)
             if len(self.queue) > 0 and self.queue[0]["msg_id"] in self.ack and self.ack[self.queue[0]["msg_id"]] == 2:
                 m1 = self.queue.pop(0)
                 # time.sleep(1)
                 self.queue = sorted(self.queue, key=lambda x: x["timestamp"])
-                time.sleep(1)
+                # time.sleep(1)
                 self.output.append(m1["data"])
                 print "Consume message with data {0} on port {1} ".format(
                     msg["data"], self.port)
@@ -123,10 +130,11 @@ class Server():
                 self.sent_ack[self.queue[0]["msg_id"]] = 1
                 self.queue[0]["ack_flag"] = 1
                 for port in ports:
-                    time.sleep(1)
+                    # time.sleep(1)
                     if len(self.queue) > 0:
                         self.send_ack(self.queue[0], port)
                 break
+            self.lock.release()
 
 
 def waitforreply(p):
