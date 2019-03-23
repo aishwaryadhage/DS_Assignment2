@@ -7,4 +7,4 @@ Detailed explanation of the protocol and design decisions are mentioned in the R
 
 Output shows a list of sequence of the messages received simultaneously by two processes.
 
-You can chose msg or msg1 for testing tom or p2p.
+We can chose msg or msg1 in sender_example.py for testing tom or p2p.
